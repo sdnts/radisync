@@ -1,0 +1,16 @@
+{
+	"name": "threesome",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"start": "wrangler dev",
+		"dev": "wrangler dev",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"typescript": "^5.0.4",
+		"wrangler": "^4.59.2"
+	},
+	"packageManager": "yarn@4.12.0"
+}
