@@ -1,48 +1,43 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "threesome",
+	"name": "radisync",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-09-27",
 	"observability": {
 		"enabled": true
 	},
+	"triggers": {
+		"crons": ["* * * * *"]
+	},
+	"vars": {
+		"GoogleOAuthClientId": "361063225776-2e94e56fbquei9mmarako1nnfq9ck7qu.apps.googleusercontent.com",
+		// "GoogleOAuthClientSecret" // Wrangler Secret
+		"AppHost": "https://radisync.sdnts.workers.dev"
+	},
+  "kv_namespaces": [
+    {
+      "id": "410bcd5487484c15a24a54efecd126da",
+      "remote": true,
+      "binding": "KV",
+    }
+  ],
 	"workflows": [
 		{
-			"name": "workflow-threesome",
-			"binding": "MY_WORKFLOW",
-			"class_name": "MyWorkflow"
+			"name": "radisync-radicale-to-google-calendar",
+			"binding": "RadicaleToGoogle",
+			"class_name": "RadicaleToGoogle"
+		},
+		{
+			"name": "radisync-google-calendar-to-radicale",
+			"binding": "GoogleToRadicale",
+			"class_name": "GoogleToRadicale"
+		}
+	],
+	"vpc_services": [
+		{
+			"binding": "BeelinkTunnel",
+			"service_id": "019bd38d-3993-7101-b468-54f6a7005b76",
+			"remote": true
 		}
 	]
-	/**
-	 * Smart Placement
-	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-	 */
-	// "placement": {  "mode": "smart" }
-	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-	 */
-	/**
-	 * Environment Variables
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-	 * Note: Use secrets to store sensitive data.
-	 * https://developers.cloudflare.com/workers/configuration/secrets/
-	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": {  "directory": "./public/",  "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
 }
