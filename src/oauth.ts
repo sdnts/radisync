@@ -59,18 +59,32 @@ export async function handleOAuthCallback(
 	const {email} = await userInfo.json() as { email: string };
 	console.log(`[oauth] User email: ${email}`);
 
-	console.log("[oauth] Creating Radicale calendar");
-	const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/calendars", {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${token.access_token}`,
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify({ summary: "Radicale" }),
+	console.log("[oauth] Looking for existing Radicale calendar");
+	const listResponse = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+		headers: { Authorization: `Bearer ${token.access_token}` },
 	});
-	const calendar = await calendarResponse.json() as { id: string };
-	await env.KV.put("googleCalendarId", calendar.id);
-	console.log(`[oauth] Calendar created: ${calendar.id}`);
+	const calendarList = await listResponse.json() as { items?: Array<{ id: string; summary: string }> };
+	const existingCalendar = calendarList.items?.find(c => c.summary === "Radicale");
+
+	let calendarId: string;
+	if (existingCalendar) {
+		calendarId = existingCalendar.id;
+		console.log(`[oauth] Found existing Radicale calendar: ${calendarId}`);
+	} else {
+		console.log("[oauth] Creating Radicale calendar");
+		const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/calendars", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${token.access_token}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ summary: "Radicale" }),
+		});
+		const calendar = await calendarResponse.json() as { id: string };
+		calendarId = calendar.id;
+		console.log(`[oauth] Calendar created: ${calendarId}`);
+	}
+	await env.KV.put("googleCalendarId", calendarId);
 
 	return new Response(null, {
 		status: 302,
