@@ -16,7 +16,7 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 
 		const syncResult = await step.do("fetch-radicale-events", async () => {
 			console.log("[RadicaleToGoogle] Fetching Radicale events");
-			return fetchRadicaleEvents(this.env.BeelinkTunnel, this.env.KV);
+			return fetchRadicaleEvents(this.env.BeelinkTunnel, this.env.KV, this.env.RadicaleUrl);
 		});
 		console.log(`[RadicaleToGoogle] Fetched ${syncResult.events.length} events, ${syncResult.deleted.length} deleted`);
 
@@ -72,7 +72,7 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 				return { deleted: 0, errors: [] };
 			}
 			console.log(`[GoogleToRadicale] Deleting ${syncResult.deleted.length} events`);
-			return deleteRadicaleEvents(this.env.BeelinkTunnel, syncResult.deleted);
+			return deleteRadicaleEvents(this.env.BeelinkTunnel, this.env.RadicaleUrl, syncResult.deleted);
 		});
 
 		const upsertResult = await step.do("upsert-radicale-events", async () => {
@@ -81,7 +81,7 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 				return { updated: 0, created: 0, errors: [] };
 			}
 			console.log(`[GoogleToRadicale] Upserting ${syncResult.events.length} events`);
-			return updateRadicaleEvents(this.env.BeelinkTunnel, syncResult.events);
+			return updateRadicaleEvents(this.env.BeelinkTunnel, this.env.RadicaleUrl, syncResult.events);
 		});
 
 		console.log(`[GoogleToRadicale] Done: deleted=${deleteResult.deleted}, updated=${upsertResult.updated}, created=${upsertResult.created}`);

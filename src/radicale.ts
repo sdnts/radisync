@@ -180,8 +180,7 @@ function toICalendar(event: GoogleEvent): string {
 	return ical;
 }
 
-export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace): Promise<SyncResult> {
-	const calendarUrl = "http://cal.sdnts.dev/sdnts/shared/";
+export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace, calendarUrl: string): Promise<SyncResult> {
 	const syncToken = await kv.get("radicaleSyncToken");
 	console.log(`[radicale] Fetching events, syncToken: ${syncToken ? "present" : "none"}`);
 
@@ -230,9 +229,9 @@ export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace): Pro
 
 export async function updateRadicaleEvents(
 	tunnel: Fetcher,
+	calendarUrl: string,
 	events: GoogleEvent[]
 ): Promise<{ updated: number; created: number; errors: string[] }> {
-	const calendarUrl = "http://cal.sdnts.dev/sdnts/shared/";
 	console.log(`[radicale] Upserting ${events.length} events`);
 	const errors: string[] = [];
 	let updated = 0;
@@ -276,9 +275,9 @@ export async function updateRadicaleEvents(
 
 export async function deleteRadicaleEvents(
 	tunnel: Fetcher,
+	calendarUrl: string,
 	uids: string[]
 ): Promise<{ deleted: number; errors: string[] }> {
-	const calendarUrl = "http://cal.sdnts.dev/sdnts/shared/";
 	console.log(`[radicale] Deleting ${uids.length} events`);
 	const errors: string[] = [];
 	let deleted = 0;
