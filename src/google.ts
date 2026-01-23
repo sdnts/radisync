@@ -15,6 +15,8 @@ interface GoogleEvent {
 	location?: string;
 	status?: string;
 	iCalUID?: string;
+	recurringEventId?: string;
+	recurrence?: string[];
 }
 
 interface GoogleEventsResponse {
@@ -56,13 +58,19 @@ function parseICalDate(
 }
 
 function toGoogleEvent(event: CalendarEvent): Omit<GoogleEvent, "id"> {
-	return {
+	const body: Omit<GoogleEvent, "id"> = {
 		summary: event.summary,
 		start: parseICalDate(event.dtstart, event.timezone),
 		end: parseICalDate(event.dtend, event.timezone),
 		description: event.description,
 		location: event.location,
 	};
+
+	if (event.rrule) {
+		body.recurrence = [`RRULE:${event.rrule}`];
+	}
+
+	return body;
 }
 
 async function getToken(kv: KVNamespace): Promise<GoogleToken> {

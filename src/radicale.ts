@@ -6,6 +6,7 @@ export interface CalendarEvent {
 	timezone?: string;
 	description?: string;
 	location?: string;
+	rrule?: string;
 }
 
 export interface SyncResult {
@@ -45,6 +46,7 @@ function parseCalDAVResponse(xml: string): CalendarEvent[] {
 		);
 		const descriptionMatch = veventData.match(/DESCRIPTION:(.+)/);
 		const locationMatch = veventData.match(/LOCATION:(.+)/);
+		const rruleMatch = veventData.match(/RRULE:(.+)/);
 
 		if (uidMatch && summaryMatch && dtstartMatch) {
 			// Prefer TZID from DTSTART/DTEND, fall back to VTIMEZONE
@@ -58,9 +60,10 @@ function parseCalDAVResponse(xml: string): CalendarEvent[] {
 				timezone,
 				description: descriptionMatch ? descriptionMatch[1].trim() : undefined,
 				location: locationMatch ? locationMatch[1].trim() : undefined,
+				rrule: rruleMatch ? rruleMatch[1].trim() : undefined,
 			};
 			console.log(
-				`[radicale] Parsed event: ${event.summary}, dtstart=${event.dtstart}, dtend=${event.dtend}, tz=${event.timezone}`,
+				`[radicale] Parsed event: ${event.summary}, dtstart=${event.dtstart}, dtend=${event.dtend}, tz=${event.timezone}, rrule=${event.rrule || "none"}`,
 			);
 			events.push(event);
 		}
@@ -112,6 +115,7 @@ export interface GoogleEvent {
 	description?: string;
 	location?: string;
 	iCalUID?: string;
+	recurrence?: string[];
 }
 
 function toICalDateUTC(start: GoogleEvent["start"]): {
@@ -197,6 +201,13 @@ function toICalendar(event: GoogleEvent): string {
 		// Always use UTC (Z suffix) for timed events
 		ical += `DTSTART:${dtstart.value}\r\n`;
 		ical += `DTEND:${dtend.value}\r\n`;
+	}
+
+	// Add recurrence rules if present
+	if (event.recurrence) {
+		for (const rule of event.recurrence) {
+			ical += `${rule}\r\n`;
+		}
 	}
 
 	if (event.description) {
