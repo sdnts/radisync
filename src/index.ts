@@ -18,6 +18,12 @@ import {
 
 type WorkflowParams = {};
 
+const debug = (msg: string, data?: unknown) => {
+	if ((globalThis as any).DEBUG === "true") {
+		console.log(`[DEBUG] ${msg}`, data ?? "");
+	}
+};
+
 export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 	async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
 		console.log("[RadicaleToGoogle] Starting workflow");
