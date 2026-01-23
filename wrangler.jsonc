@@ -37,6 +37,11 @@
 	],
 	"workflows": [
 		{
+			"name": "radisync-refresh-google-token",
+			"binding": "RefreshGoogleToken",
+			"class_name": "RefreshGoogleToken"
+		},
+		{
 			"name": "radisync-radicale-to-google-calendar",
 			"binding": "RadicaleToGoogle",
 			"class_name": "RadicaleToGoogle"

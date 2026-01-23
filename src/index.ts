@@ -6,6 +6,7 @@ import {
 import {
 	deleteGoogleEvents,
 	fetchGoogleEvents,
+	refreshGoogleToken,
 	updateGoogleEvents,
 } from "./google";
 import { renderLoginPage } from "./login";
@@ -18,11 +19,26 @@ import {
 
 type WorkflowParams = {};
 
-const debug = (msg: string, data?: unknown) => {
-	if ((globalThis as any).DEBUG === "true") {
-		console.log(`[DEBUG] ${msg}`, data ?? "");
+export class RefreshGoogleToken extends WorkflowEntrypoint<
+	Env,
+	WorkflowParams
+> {
+	async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
+		console.log("[RefreshGoogleToken] Starting workflow");
+
+		await step.do("refresh-google-token", async () => {
+			console.log("[RefreshGoogleToken] Refreshing Google OAuth token");
+			return refreshGoogleToken(
+				this.env.KV,
+				this.env.GoogleOAuthClientId,
+				this.env.GoogleOAuthClientSecret,
+			);
+		});
+
+		console.log("[RefreshGoogleToken] Done");
+		return { success: true };
 	}
-};
+}
 
 export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 	async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
@@ -180,6 +196,12 @@ export default {
 			);
 			return;
 		}
+
+		console.log("[scheduled] Triggering RefreshGoogleToken workflow");
+		const refreshInstance = await env.RefreshGoogleToken.create();
+		console.log(
+			`[scheduled] Started RefreshGoogleToken: ${refreshInstance.id}`,
+		);
 
 		console.log("[scheduled] Triggering RadicaleToGoogle workflow");
 		const radicaleInstance = await env.RadicaleToGoogle.create();

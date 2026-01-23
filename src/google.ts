@@ -73,6 +73,46 @@ async function getToken(kv: KVNamespace): Promise<GoogleToken> {
 	return JSON.parse(tokenData);
 }
 
+export async function refreshGoogleToken(
+	kv: KVNamespace,
+	clientId: string,
+	clientSecret: string,
+): Promise<void> {
+	const token = await getToken(kv);
+	if (!token.refresh_token) {
+		console.log("[google] No refresh token available, skipping token refresh");
+		return;
+	}
+
+	console.log("[google] Refreshing Google OAuth token");
+	const response = await fetch("https://oauth2.googleapis.com/token", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		body: new URLSearchParams({
+			client_id: clientId,
+			client_secret: clientSecret,
+			refresh_token: token.refresh_token,
+			grant_type: "refresh_token",
+		}).toString(),
+	});
+
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`Failed to refresh token: ${error}`);
+	}
+
+	const newToken = (await response.json()) as GoogleToken;
+	const updatedToken: GoogleToken = {
+		...newToken,
+		refresh_token: token.refresh_token,
+	};
+
+	await kv.put("googleOAuthToken", JSON.stringify(updatedToken));
+	console.log("[google] Token refreshed successfully");
+}
+
 export async function fetchGoogleEvents(
 	kv: KVNamespace,
 ): Promise<GoogleSyncResult> {
