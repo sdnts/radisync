@@ -15,13 +15,13 @@
 		"AppHost": "https://radisync.sdnts.workers.dev",
 		"RadicaleUrl": "http://cal.sdnts.dev/sdnts/shared/"
 	},
-  "kv_namespaces": [
-    {
-      "id": "410bcd5487484c15a24a54efecd126da",
-      "remote": true,
-      "binding": "KV",
-    }
-  ],
+	"kv_namespaces": [
+		{
+			"id": "410bcd5487484c15a24a54efecd126da",
+			"remote": true,
+			"binding": "KV"
+		}
+	],
 	"workflows": [
 		{
 			"name": "radisync-radicale-to-google-calendar",

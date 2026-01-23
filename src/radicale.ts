@@ -16,32 +16,40 @@ export interface SyncResult {
 
 function parseCalDAVResponse(xml: string): CalendarEvent[] {
 	const events: CalendarEvent[] = [];
-	const calendarDataRegex = /<(?:[a-z]+:)?calendar-data[^>]*>([\s\S]*?)<\/(?:[a-z]+:)?calendar-data>/gi;
+	const calendarDataRegex =
+		/<(?:[a-z]+:)?calendar-data[^>]*>([\s\S]*?)<\/(?:[a-z]+:)?calendar-data>/gi;
 	let match;
 
 	while ((match = calendarDataRegex.exec(xml)) !== null) {
 		// Unfold iCal lines (CRLF + space/tab continuation)
 		const icalData = match[1].replace(/\r?\n[ \t]/g, "");
-		
+
 		// Extract just the VEVENT block to avoid matching VTIMEZONE's DTSTART
 		const veventMatch = icalData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/);
 		if (!veventMatch) continue;
 		const veventData = veventMatch[1];
-		
+
 		// Get timezone from VTIMEZONE block if present
-		const vtimezoneMatch = icalData.match(/BEGIN:VTIMEZONE[\s\S]*?TZID:([^\r\n]+)/);
+		const vtimezoneMatch = icalData.match(
+			/BEGIN:VTIMEZONE[\s\S]*?TZID:([^\r\n]+)/,
+		);
 		const vtimezone = vtimezoneMatch?.[1]?.trim();
 
 		const uidMatch = veventData.match(/UID:(.+)/);
 		const summaryMatch = veventData.match(/SUMMARY:(.+)/);
-		const dtstartMatch = veventData.match(/DTSTART(?:;TZID=([^:;]+))?(?:;[^:]*)?:(.+)/);
-		const dtendMatch = veventData.match(/DTEND(?:;TZID=([^:;]+))?(?:;[^:]*)?:(.+)/);
+		const dtstartMatch = veventData.match(
+			/DTSTART(?:;TZID=([^:;]+))?(?:;[^:]*)?:(.+)/,
+		);
+		const dtendMatch = veventData.match(
+			/DTEND(?:;TZID=([^:;]+))?(?:;[^:]*)?:(.+)/,
+		);
 		const descriptionMatch = veventData.match(/DESCRIPTION:(.+)/);
 		const locationMatch = veventData.match(/LOCATION:(.+)/);
 
 		if (uidMatch && summaryMatch && dtstartMatch) {
 			// Prefer TZID from DTSTART/DTEND, fall back to VTIMEZONE
-			const timezone = dtstartMatch[1]?.trim() || dtendMatch?.[1]?.trim() || vtimezone;
+			const timezone =
+				dtstartMatch[1]?.trim() || dtendMatch?.[1]?.trim() || vtimezone;
 			const event = {
 				uid: uidMatch[1].trim(),
 				summary: summaryMatch[1].trim(),
@@ -51,7 +59,9 @@ function parseCalDAVResponse(xml: string): CalendarEvent[] {
 				description: descriptionMatch ? descriptionMatch[1].trim() : undefined,
 				location: locationMatch ? locationMatch[1].trim() : undefined,
 			};
-			console.log(`[radicale] Parsed event: ${event.summary}, dtstart=${event.dtstart}, dtend=${event.dtend}, tz=${event.timezone}`);
+			console.log(
+				`[radicale] Parsed event: ${event.summary}, dtstart=${event.dtstart}, dtend=${event.dtend}, tz=${event.timezone}`,
+			);
 			events.push(event);
 		}
 	}
@@ -60,20 +70,27 @@ function parseCalDAVResponse(xml: string): CalendarEvent[] {
 }
 
 function parseSyncToken(xml: string): string | null {
-	const syncTokenMatch = xml.match(/<(?:[a-z]+:)?sync-token[^>]*>([^<]+)<\/(?:[a-z]+:)?sync-token>/i);
+	const syncTokenMatch = xml.match(
+		/<(?:[a-z]+:)?sync-token[^>]*>([^<]+)<\/(?:[a-z]+:)?sync-token>/i,
+	);
 	return syncTokenMatch ? syncTokenMatch[1].trim() : null;
 }
 
 function parseDeletedHrefs(xml: string): string[] {
 	const deleted: string[] = [];
-	const responseRegex = /<(?:[a-z]+:)?response[^>]*>([\s\S]*?)<\/(?:[a-z]+:)?response>/gi;
+	const responseRegex =
+		/<(?:[a-z]+:)?response[^>]*>([\s\S]*?)<\/(?:[a-z]+:)?response>/gi;
 	let match;
 
 	while ((match = responseRegex.exec(xml)) !== null) {
 		const responseXml = match[1];
-		const statusMatch = responseXml.match(/<(?:[a-z]+:)?status[^>]*>([^<]+)<\/(?:[a-z]+:)?status>/i);
+		const statusMatch = responseXml.match(
+			/<(?:[a-z]+:)?status[^>]*>([^<]+)<\/(?:[a-z]+:)?status>/i,
+		);
 		if (statusMatch && statusMatch[1].includes("404")) {
-			const hrefMatch = responseXml.match(/<(?:[a-z]+:)?href[^>]*>([^<]+)<\/(?:[a-z]+:)?href>/i);
+			const hrefMatch = responseXml.match(
+				/<(?:[a-z]+:)?href[^>]*>([^<]+)<\/(?:[a-z]+:)?href>/i,
+			);
 			if (hrefMatch) {
 				const href = hrefMatch[1].trim();
 				const uidMatch = href.match(/([^/]+)\.ics$/);
@@ -97,7 +114,10 @@ export interface GoogleEvent {
 	iCalUID?: string;
 }
 
-function toICalDateUTC(start: GoogleEvent["start"]): { value: string; isAllDay: boolean } {
+function toICalDateUTC(start: GoogleEvent["start"]): {
+	value: string;
+	isAllDay: boolean;
+} {
 	if (start.date) {
 		// All-day event: YYYY-MM-DD -> YYYYMMDD
 		return { value: start.date.replace(/-/g, ""), isAllDay: true };
@@ -105,7 +125,7 @@ function toICalDateUTC(start: GoogleEvent["start"]): { value: string; isAllDay: 
 	// DateTime event - convert to UTC
 	const dt = start.dateTime!;
 	const tz = start.timeZone;
-	
+
 	// Parse the datetime and convert to UTC
 	let date: Date;
 	if (dt.endsWith("Z")) {
@@ -118,9 +138,13 @@ function toICalDateUTC(start: GoogleEvent["start"]): { value: string; isAllDay: 
 		// Use Intl to get the offset and adjust
 		const formatter = new Intl.DateTimeFormat("en-US", {
 			timeZone: tz,
-			year: "numeric", month: "2-digit", day: "2-digit",
-			hour: "2-digit", minute: "2-digit", second: "2-digit",
-			hour12: false
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+			hour12: false,
 		});
 		// Parse the original datetime components
 		const match = dt.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
@@ -143,8 +167,11 @@ function toICalDateUTC(start: GoogleEvent["start"]): { value: string; isAllDay: 
 	} else {
 		date = new Date(dt);
 	}
-	
-	const utcString = date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+
+	const utcString = date
+		.toISOString()
+		.replace(/[-:]/g, "")
+		.replace(/\.\d{3}/, "");
 	return { value: utcString, isAllDay: false };
 }
 
@@ -152,7 +179,10 @@ function toICalendar(event: GoogleEvent): string {
 	const uid = event.iCalUID || event.id;
 	const dtstart = toICalDateUTC(event.start);
 	const dtend = toICalDateUTC(event.end);
-	const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+	const now = new Date()
+		.toISOString()
+		.replace(/[-:]/g, "")
+		.replace(/\.\d{3}/, "");
 
 	let ical = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//radisync//caldav//EN\r\n`;
 	ical += `BEGIN:VEVENT\r\n`;
@@ -180,12 +210,18 @@ function toICalendar(event: GoogleEvent): string {
 	return ical;
 }
 
-export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace, calendarUrl: string): Promise<SyncResult> {
+export async function fetchRadicaleEvents(
+	tunnel: Fetcher,
+	kv: KVNamespace,
+	calendarUrl: string,
+): Promise<SyncResult> {
 	const syncToken = await kv.get("radicaleSyncToken");
-	console.log(`[radicale] Fetching events, syncToken: ${syncToken ? "present" : "none"}`);
+	console.log(
+		`[radicale] Fetching events, syncToken: ${syncToken ? "present" : "none"}`,
+	);
 
-	const syncTokenElement = syncToken 
-		? `<d:sync-token>${syncToken}</d:sync-token>` 
+	const syncTokenElement = syncToken
+		? `<d:sync-token>${syncToken}</d:sync-token>`
 		: `<d:sync-token/>`;
 
 	const reportBody = `<?xml version="1.0" encoding="utf-8"?>
@@ -208,8 +244,12 @@ export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace, cale
 	});
 
 	if (!response.ok) {
-		console.log(`[radicale] Request failed: ${response.status} ${response.statusText}`);
-		throw new Error(`CalDAV sync-collection request failed: ${response.status} ${response.statusText}`);
+		console.log(
+			`[radicale] Request failed: ${response.status} ${response.statusText}`,
+		);
+		throw new Error(
+			`CalDAV sync-collection request failed: ${response.status} ${response.statusText}`,
+		);
 	}
 
 	const xml = await response.text();
@@ -221,8 +261,9 @@ export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace, cale
 		throw new Error("No sync-token in response");
 	}
 
-	await kv.put("radicaleSyncToken", newSyncToken);
-	console.log(`[radicale] Done: ${events.length} events, ${deleted.length} deleted`);
+	console.log(
+		`[radicale] Done: ${events.length} events, ${deleted.length} deleted`,
+	);
 
 	return { events, deleted, syncToken: newSyncToken };
 }
@@ -230,7 +271,7 @@ export async function fetchRadicaleEvents(tunnel: Fetcher, kv: KVNamespace, cale
 export async function updateRadicaleEvents(
 	tunnel: Fetcher,
 	calendarUrl: string,
-	events: GoogleEvent[]
+	events: GoogleEvent[],
 ): Promise<{ updated: number; created: number; errors: string[] }> {
 	console.log(`[radicale] Upserting ${events.length} events`);
 	const errors: string[] = [];
@@ -269,14 +310,16 @@ export async function updateRadicaleEvents(
 		}
 	}
 
-	console.log(`[radicale] Upsert complete: ${updated} updated, ${created} created, ${errors.length} errors`);
+	console.log(
+		`[radicale] Upsert complete: ${updated} updated, ${created} created, ${errors.length} errors`,
+	);
 	return { updated, created, errors };
 }
 
 export async function deleteRadicaleEvents(
 	tunnel: Fetcher,
 	calendarUrl: string,
-	uids: string[]
+	uids: string[],
 ): Promise<{ deleted: number; errors: string[] }> {
 	console.log(`[radicale] Deleting ${uids.length} events`);
 	const errors: string[] = [];
@@ -299,6 +342,8 @@ export async function deleteRadicaleEvents(
 		}
 	}
 
-	console.log(`[radicale] Delete complete: ${deleted} deleted, ${errors.length} errors`);
+	console.log(
+		`[radicale] Delete complete: ${deleted} deleted, ${errors.length} errors`,
+	);
 	return { deleted, errors };
 }

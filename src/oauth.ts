@@ -16,7 +16,7 @@ export async function exchangeCodeForToken(
 	code: string,
 	clientId: string,
 	clientSecret: string,
-	appHost: string
+	appHost: string,
 ): Promise<object> {
 	const response = await fetch("https://oauth2.googleapis.com/token", {
 		method: "POST",
@@ -34,7 +34,7 @@ export async function exchangeCodeForToken(
 
 export async function handleOAuthCallback(
 	url: URL,
-	env: Env
+	env: Env,
 ): Promise<Response> {
 	console.log("[oauth] Handling OAuth callback");
 	const code = url.searchParams.get("code");
@@ -44,27 +44,37 @@ export async function handleOAuthCallback(
 	}
 
 	console.log("[oauth] Exchanging code for token");
-	const token = await exchangeCodeForToken(
+	const token = (await exchangeCodeForToken(
 		code,
 		env.GoogleOAuthClientId,
 		env.GoogleOAuthClientSecret,
-		env.AppHost
-	) as { access_token: string };
+		env.AppHost,
+	)) as { access_token: string };
 	await env.KV.put("googleOAuthToken", JSON.stringify(token));
 	console.log("[oauth] Token stored in KV");
 
-	const userInfo = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-		headers: { Authorization: `Bearer ${token.access_token}` },
-	});
-	const {email} = await userInfo.json() as { email: string };
+	const userInfo = await fetch(
+		"https://www.googleapis.com/oauth2/v2/userinfo",
+		{
+			headers: { Authorization: `Bearer ${token.access_token}` },
+		},
+	);
+	const { email } = (await userInfo.json()) as { email: string };
 	console.log(`[oauth] User email: ${email}`);
 
 	console.log("[oauth] Looking for existing Radicale calendar");
-	const listResponse = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
-		headers: { Authorization: `Bearer ${token.access_token}` },
-	});
-	const calendarList = await listResponse.json() as { items?: Array<{ id: string; summary: string }> };
-	const existingCalendar = calendarList.items?.find(c => c.summary === "Radicale");
+	const listResponse = await fetch(
+		"https://www.googleapis.com/calendar/v3/users/me/calendarList",
+		{
+			headers: { Authorization: `Bearer ${token.access_token}` },
+		},
+	);
+	const calendarList = (await listResponse.json()) as {
+		items?: Array<{ id: string; summary: string }>;
+	};
+	const existingCalendar = calendarList.items?.find(
+		(c) => c.summary === "Radicale",
+	);
 
 	let calendarId: string;
 	if (existingCalendar) {
@@ -72,15 +82,18 @@ export async function handleOAuthCallback(
 		console.log(`[oauth] Found existing Radicale calendar: ${calendarId}`);
 	} else {
 		console.log("[oauth] Creating Radicale calendar");
-		const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/calendars", {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${token.access_token}`,
-				"Content-Type": "application/json",
+		const calendarResponse = await fetch(
+			"https://www.googleapis.com/calendar/v3/calendars",
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${token.access_token}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ summary: "Radicale" }),
 			},
-			body: JSON.stringify({ summary: "Radicale" }),
-		});
-		const calendar = await calendarResponse.json() as { id: string };
+		);
+		const calendar = (await calendarResponse.json()) as { id: string };
 		calendarId = calendar.id;
 		console.log(`[oauth] Calendar created: ${calendarId}`);
 	}

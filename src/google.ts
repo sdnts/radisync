@@ -1,4 +1,4 @@
-import { CalendarEvent } from "./radicale";
+import type { CalendarEvent } from "./radicale";
 
 interface GoogleToken {
 	access_token: string;
@@ -29,10 +29,15 @@ export interface GoogleSyncResult {
 	syncToken: string;
 }
 
-function parseICalDate(icalDate: string, timezone?: string): { dateTime?: string; date?: string; timeZone?: string } {
+function parseICalDate(
+	icalDate: string,
+	timezone?: string,
+): { dateTime?: string; date?: string; timeZone?: string } {
 	if (icalDate.length === 8) {
 		// All-day event: YYYYMMDD
-		return { date: `${icalDate.slice(0, 4)}-${icalDate.slice(4, 6)}-${icalDate.slice(6, 8)}` };
+		return {
+			date: `${icalDate.slice(0, 4)}-${icalDate.slice(4, 6)}-${icalDate.slice(6, 8)}`,
+		};
 	}
 	// DateTime: YYYYMMDDTHHmmssZ or YYYYMMDDTHHmmss
 	const year = icalDate.slice(0, 4);
@@ -43,7 +48,7 @@ function parseICalDate(icalDate: string, timezone?: string): { dateTime?: string
 	const second = icalDate.slice(13, 15);
 	const isUtc = icalDate.endsWith("Z");
 	const dateTime = `${year}-${month}-${day}T${hour}:${minute}:${second}${isUtc ? "Z" : ""}`;
-	
+
 	if (isUtc) {
 		return { dateTime };
 	}
@@ -68,7 +73,9 @@ async function getToken(kv: KVNamespace): Promise<GoogleToken> {
 	return JSON.parse(tokenData);
 }
 
-export async function fetchGoogleEvents(kv: KVNamespace): Promise<GoogleSyncResult> {
+export async function fetchGoogleEvents(
+	kv: KVNamespace,
+): Promise<GoogleSyncResult> {
 	const calendarId = await kv.get("googleCalendarId");
 	if (!calendarId) {
 		throw new Error("No Google Calendar ID found in KV");
@@ -76,7 +83,9 @@ export async function fetchGoogleEvents(kv: KVNamespace): Promise<GoogleSyncResu
 
 	const token = await getToken(kv);
 	const syncToken = await kv.get("googleSyncToken");
-	console.log(`[google] Fetching events, syncToken: ${syncToken ? "present" : "none"}`);
+	console.log(
+		`[google] Fetching events, syncToken: ${syncToken ? "present" : "none"}`,
+	);
 
 	const events: GoogleEvent[] = [];
 	const deleted: string[] = [];
@@ -104,14 +113,18 @@ export async function fetchGoogleEvents(kv: KVNamespace): Promise<GoogleSyncResu
 		});
 
 		if (response.status === 410) {
-			console.log("[google] Sync token expired, clearing and retrying with full sync");
+			console.log(
+				"[google] Sync token expired, clearing and retrying with full sync",
+			);
 			await kv.delete("googleSyncToken");
 			return fetchGoogleEvents(kv);
 		}
 
 		if (!response.ok) {
 			const error = await response.text();
-			throw new Error(`Google Calendar API failed: ${response.status} ${error}`);
+			throw new Error(
+				`Google Calendar API failed: ${response.status} ${error}`,
+			);
 		}
 
 		const data = (await response.json()) as GoogleEventsResponse;
@@ -136,8 +149,9 @@ export async function fetchGoogleEvents(kv: KVNamespace): Promise<GoogleSyncResu
 		throw new Error("No sync token in Google Calendar response");
 	}
 
-	await kv.put("googleSyncToken", newSyncToken);
-	console.log(`[google] Done: ${events.length} events, ${deleted.length} deleted`);
+	console.log(
+		`[google] Done: ${events.length} events, ${deleted.length} deleted`,
+	);
 
 	return { events, deleted, syncToken: newSyncToken };
 }
@@ -145,7 +159,7 @@ export async function fetchGoogleEvents(kv: KVNamespace): Promise<GoogleSyncResu
 export async function createGoogleEvents(
 	kv: KVNamespace,
 	calendarId: string,
-	events: CalendarEvent[]
+	events: CalendarEvent[],
 ): Promise<{ created: number; errors: string[] }> {
 	const token = await getToken(kv);
 	const errors: string[] = [];
@@ -165,7 +179,7 @@ export async function createGoogleEvents(
 					...googleEvent,
 					iCalUID: event.uid,
 				}),
-			}
+			},
 		);
 
 		if (response.ok) {
@@ -182,7 +196,7 @@ export async function createGoogleEvents(
 export async function deleteGoogleEvents(
 	kv: KVNamespace,
 	calendarId: string,
-	uids: string[]
+	uids: string[],
 ): Promise<{ deleted: number; errors: string[] }> {
 	console.log(`[google] Deleting ${uids.length} events`);
 	const token = await getToken(kv);
@@ -196,7 +210,7 @@ export async function deleteGoogleEvents(
 				headers: {
 					Authorization: `Bearer ${token.access_token}`,
 				},
-			}
+			},
 		);
 
 		if (!searchResponse.ok) {
@@ -206,7 +220,9 @@ export async function deleteGoogleEvents(
 			continue;
 		}
 
-		const searchResult = (await searchResponse.json()) as { items?: { id: string }[] };
+		const searchResult = (await searchResponse.json()) as {
+			items?: { id: string }[];
+		};
 		if (!searchResult.items || searchResult.items.length === 0) {
 			console.log(`[google] Event ${uid} not found, skipping`);
 			continue;
@@ -220,7 +236,7 @@ export async function deleteGoogleEvents(
 				headers: {
 					Authorization: `Bearer ${token.access_token}`,
 				},
-			}
+			},
 		);
 
 		if (deleteResponse.ok || deleteResponse.status === 404) {
@@ -233,14 +249,16 @@ export async function deleteGoogleEvents(
 		}
 	}
 
-	console.log(`[google] Delete complete: ${deleted} deleted, ${errors.length} errors`);
+	console.log(
+		`[google] Delete complete: ${deleted} deleted, ${errors.length} errors`,
+	);
 	return { deleted, errors };
 }
 
 export async function updateGoogleEvents(
 	kv: KVNamespace,
 	calendarId: string,
-	events: CalendarEvent[]
+	events: CalendarEvent[],
 ): Promise<{ updated: number; created: number; errors: string[] }> {
 	console.log(`[google] Upserting ${events.length} events`);
 	const token = await getToken(kv);
@@ -255,7 +273,7 @@ export async function updateGoogleEvents(
 				headers: {
 					Authorization: `Bearer ${token.access_token}`,
 				},
-			}
+			},
 		);
 
 		if (!searchResponse.ok) {
@@ -265,7 +283,9 @@ export async function updateGoogleEvents(
 			continue;
 		}
 
-		const searchResult = (await searchResponse.json()) as { items?: { id: string }[] };
+		const searchResult = (await searchResponse.json()) as {
+			items?: { id: string }[];
+		};
 		const googleEvent = toGoogleEvent(event);
 
 		if (searchResult.items && searchResult.items.length > 0) {
@@ -279,7 +299,7 @@ export async function updateGoogleEvents(
 						"Content-Type": "application/json",
 					},
 					body: JSON.stringify(googleEvent),
-				}
+				},
 			);
 
 			if (updateResponse.ok) {
@@ -303,7 +323,7 @@ export async function updateGoogleEvents(
 						...googleEvent,
 						iCalUID: event.uid,
 					}),
-				}
+				},
 			);
 
 			if (createResponse.ok) {
@@ -317,6 +337,8 @@ export async function updateGoogleEvents(
 		}
 	}
 
-	console.log(`[google] Upsert complete: ${updated} updated, ${created} created, ${errors.length} errors`);
+	console.log(
+		`[google] Upsert complete: ${updated} updated, ${created} created, ${errors.length} errors`,
+	);
 	return { updated, created, errors };
 }

@@ -1,12 +1,20 @@
 import {
 	WorkflowEntrypoint,
-	WorkflowEvent,
-	WorkflowStep,
+	type WorkflowEvent,
+	type WorkflowStep,
 } from "cloudflare:workers";
-import { handleOAuthCallback } from "./oauth";
+import {
+	deleteGoogleEvents,
+	fetchGoogleEvents,
+	updateGoogleEvents,
+} from "./google";
 import { renderLoginPage } from "./login";
-import { fetchRadicaleEvents, updateRadicaleEvents, deleteRadicaleEvents } from "./radicale";
-import { deleteGoogleEvents, updateGoogleEvents, fetchGoogleEvents } from "./google";
+import { handleOAuthCallback } from "./oauth";
+import {
+	deleteRadicaleEvents,
+	fetchRadicaleEvents,
+	updateRadicaleEvents,
+} from "./radicale";
 
 type WorkflowParams = {};
 
@@ -16,9 +24,15 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 
 		const syncResult = await step.do("fetch-radicale-events", async () => {
 			console.log("[RadicaleToGoogle] Fetching Radicale events");
-			return fetchRadicaleEvents(this.env.BeelinkTunnel, this.env.KV, this.env.RadicaleUrl);
+			return fetchRadicaleEvents(
+				this.env.BeelinkTunnel,
+				this.env.KV,
+				this.env.RadicaleUrl,
+			);
 		});
-		console.log(`[RadicaleToGoogle] Fetched ${syncResult.events.length} events, ${syncResult.deleted.length} deleted`);
+		console.log(
+			`[RadicaleToGoogle] Fetched ${syncResult.events.length} events, ${syncResult.deleted.length} deleted`,
+		);
 
 		const calendarId = await step.do("get-calendar-id", async () => {
 			const id = await this.env.KV.get("googleCalendarId");
@@ -34,7 +48,9 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 				console.log("[RadicaleToGoogle] No events to delete");
 				return { deleted: 0, errors: [] };
 			}
-			console.log(`[RadicaleToGoogle] Deleting ${syncResult.deleted.length} events`);
+			console.log(
+				`[RadicaleToGoogle] Deleting ${syncResult.deleted.length} events`,
+			);
 			return deleteGoogleEvents(this.env.KV, calendarId, syncResult.deleted);
 		});
 
@@ -43,11 +59,29 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 				console.log("[RadicaleToGoogle] No events to upsert");
 				return { updated: 0, created: 0, errors: [] };
 			}
-			console.log(`[RadicaleToGoogle] Upserting ${syncResult.events.length} events`);
+			console.log(
+				`[RadicaleToGoogle] Upserting ${syncResult.events.length} events`,
+			);
 			return updateGoogleEvents(this.env.KV, calendarId, syncResult.events);
 		});
 
-		console.log(`[RadicaleToGoogle] Done: deleted=${deleteResult.deleted}, updated=${upsertResult.updated}, created=${upsertResult.created}`);
+		// Only save sync token if there were no errors
+		const hasErrors =
+			deleteResult.errors.length > 0 || upsertResult.errors.length > 0;
+		if (!hasErrors) {
+			await step.do("save-sync-token", async () => {
+				console.log("[RadicaleToGoogle] Saving sync token");
+				await this.env.KV.put("radicaleSyncToken", syncResult.syncToken);
+			});
+		} else {
+			console.log(
+				`[RadicaleToGoogle] Skipping sync token save due to ${deleteResult.errors.length + upsertResult.errors.length} errors`,
+			);
+		}
+
+		console.log(
+			`[RadicaleToGoogle] Done: deleted=${deleteResult.deleted}, updated=${upsertResult.updated}, created=${upsertResult.created}`,
+		);
 		return {
 			syncToken: syncResult.syncToken,
 			deleted: deleteResult,
@@ -64,15 +98,23 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 			console.log("[GoogleToRadicale] Fetching Google Calendar events");
 			return fetchGoogleEvents(this.env.KV);
 		});
-		console.log(`[GoogleToRadicale] Fetched ${syncResult.events.length} events, ${syncResult.deleted.length} deleted`);
+		console.log(
+			`[GoogleToRadicale] Fetched ${syncResult.events.length} events, ${syncResult.deleted.length} deleted`,
+		);
 
 		const deleteResult = await step.do("delete-radicale-events", async () => {
 			if (syncResult.deleted.length === 0) {
 				console.log("[GoogleToRadicale] No events to delete");
 				return { deleted: 0, errors: [] };
 			}
-			console.log(`[GoogleToRadicale] Deleting ${syncResult.deleted.length} events`);
-			return deleteRadicaleEvents(this.env.BeelinkTunnel, this.env.RadicaleUrl, syncResult.deleted);
+			console.log(
+				`[GoogleToRadicale] Deleting ${syncResult.deleted.length} events`,
+			);
+			return deleteRadicaleEvents(
+				this.env.BeelinkTunnel,
+				this.env.RadicaleUrl,
+				syncResult.deleted,
+			);
 		});
 
 		const upsertResult = await step.do("upsert-radicale-events", async () => {
@@ -80,11 +122,33 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 				console.log("[GoogleToRadicale] No events to upsert");
 				return { updated: 0, created: 0, errors: [] };
 			}
-			console.log(`[GoogleToRadicale] Upserting ${syncResult.events.length} events`);
-			return updateRadicaleEvents(this.env.BeelinkTunnel, this.env.RadicaleUrl, syncResult.events);
+			console.log(
+				`[GoogleToRadicale] Upserting ${syncResult.events.length} events`,
+			);
+			return updateRadicaleEvents(
+				this.env.BeelinkTunnel,
+				this.env.RadicaleUrl,
+				syncResult.events,
+			);
 		});
 
-		console.log(`[GoogleToRadicale] Done: deleted=${deleteResult.deleted}, updated=${upsertResult.updated}, created=${upsertResult.created}`);
+		// Only save sync token if there were no errors
+		const hasErrors =
+			deleteResult.errors.length > 0 || upsertResult.errors.length > 0;
+		if (!hasErrors) {
+			await step.do("save-sync-token", async () => {
+				console.log("[GoogleToRadicale] Saving sync token");
+				await this.env.KV.put("googleSyncToken", syncResult.syncToken);
+			});
+		} else {
+			console.log(
+				`[GoogleToRadicale] Skipping sync token save due to ${deleteResult.errors.length + upsertResult.errors.length} errors`,
+			);
+		}
+
+		console.log(
+			`[GoogleToRadicale] Done: deleted=${deleteResult.deleted}, updated=${upsertResult.updated}, created=${upsertResult.created}`,
+		);
 		return {
 			syncToken: syncResult.syncToken,
 			deleted: deleteResult,
@@ -94,14 +158,20 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 }
 
 export default {
-	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+	async scheduled(
+		event: ScheduledEvent,
+		env: Env,
+		ctx: ExecutionContext,
+	): Promise<void> {
 		const [googleOAuthToken, googleCalendarId] = await Promise.all([
 			env.KV.get("googleOAuthToken"),
 			env.KV.get("googleCalendarId"),
 		]);
 
 		if (!googleOAuthToken || !googleCalendarId) {
-			console.error("[scheduled] Missing required KV keys: googleOAuthToken or googleCalendarId not set");
+			console.error(
+				"[scheduled] Missing required KV keys: googleOAuthToken or googleCalendarId not set",
+			);
 			return;
 		}
 
