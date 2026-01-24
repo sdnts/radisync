@@ -15,7 +15,7 @@
 - **Workflows**:
   - `RadicaleToGoogle` - Syncs events from Radicale → Google Calendar
   - `GoogleToRadicale` - Syncs events from Google Calendar → Radicale
-- **Scheduled**: Cron runs every minute (`* * * * *`), triggers both workflows
+- **Scheduled**: Cron runs once per hour (`0 * * * *`), triggers both workflows
 - **Routes**: `/oauth` (OAuth callback), `/logout` (clear auth), `/` (login page)
 
 ## Bindings
