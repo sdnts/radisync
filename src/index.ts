@@ -75,6 +75,11 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 			);
 			return deleteGoogleEvents(this.env.KV, calendarId, syncResult.deleted);
 		});
+		if (deleteResult.errors.length > 0) {
+			deleteResult.errors.forEach((error) => {
+				console.error(`[RadicaleToGoogle] Delete error: ${error}`);
+			});
+		}
 
 		const upsertResult = await step.do("upsert-google-events", async () => {
 			if (syncResult.events.length === 0) {
@@ -86,6 +91,11 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 			);
 			return updateGoogleEvents(this.env.KV, calendarId, syncResult.events);
 		});
+		if (upsertResult.errors.length > 0) {
+			upsertResult.errors.forEach((error) => {
+				console.error(`[RadicaleToGoogle] Upsert error: ${error}`);
+			});
+		}
 
 		// Only save sync token if there were no errors
 		const hasErrors =
@@ -96,7 +106,7 @@ export class RadicaleToGoogle extends WorkflowEntrypoint<Env, WorkflowParams> {
 				await this.env.KV.put("radicaleSyncToken", syncResult.syncToken);
 			});
 		} else {
-			console.log(
+			console.error(
 				`[RadicaleToGoogle] Skipping sync token save due to ${deleteResult.errors.length + upsertResult.errors.length} errors`,
 			);
 		}
@@ -138,6 +148,11 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 				syncResult.deleted,
 			);
 		});
+		if (deleteResult.errors.length > 0) {
+			deleteResult.errors.forEach((error) => {
+				console.error(`[GoogleToRadicale] Delete error: ${error}`);
+			});
+		}
 
 		const upsertResult = await step.do("upsert-radicale-events", async () => {
 			if (syncResult.events.length === 0) {
@@ -153,6 +168,11 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 				syncResult.events,
 			);
 		});
+		if (upsertResult.errors.length > 0) {
+			upsertResult.errors.forEach((error) => {
+				console.error(`[GoogleToRadicale] Upsert error: ${error}`);
+			});
+		}
 
 		// Only save sync token if there were no errors
 		const hasErrors =
@@ -163,7 +183,7 @@ export class GoogleToRadicale extends WorkflowEntrypoint<Env, WorkflowParams> {
 				await this.env.KV.put("googleSyncToken", syncResult.syncToken);
 			});
 		} else {
-			console.log(
+			console.error(
 				`[GoogleToRadicale] Skipping sync token save due to ${deleteResult.errors.length + upsertResult.errors.length} errors`,
 			);
 		}
