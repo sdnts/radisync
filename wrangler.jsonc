@@ -4,8 +4,7 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2025-09-27",
 	"observability": {
-		"enabled": true,
-		"head_sampling_rate": 0.01
+		"enabled": true
 	},
 
 	"triggers": {
